@@ -1,0 +1,7 @@
+# Variables for PRD environment
+variables:
+  environment: 'prd'
+  namespace: 'adminservices'
+  containerRegistry: 'yourregistryprd'
+  keyvault: 'your-keyvault-prd'
+  appconfig: 'your-appconfig-prd'

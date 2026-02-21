@@ -1,0 +1,13 @@
+.vs/
+.vscode/
+bin/
+obj/
+*.user
+*.suo
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+appsettings.Local.json
+launchSettings.json
+*.DotSettings.user

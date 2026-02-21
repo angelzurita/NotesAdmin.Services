@@ -1,0 +1,7 @@
+# Variables for QA environment
+variables:
+  environment: 'qa'
+  namespace: 'adminservices'
+  containerRegistry: 'yourregistryqa'
+  keyvault: 'your-keyvault-qa'
+  appconfig: 'your-appconfig-qa'

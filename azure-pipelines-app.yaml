@@ -1,0 +1,108 @@
+variables:
+  route: 'AdminServices.sln'
+  dockerfileRoute: '$(System.DefaultWorkingDirectory)/Dockerfile.app'
+  containerRegistryDEV: 'yourregistrydev'
+  containerRegistryQA: 'yourregistryqa'
+  containerRegistryPRD: 'yourregistryprd'
+  repositoryName: 'adminservices.app'
+  buildContext: '$(System.DefaultWorkingDirectory)'
+        
+trigger:
+ - dev
+ - qa
+ - main
+
+stages:
+- stage: 'DEV'
+  condition: and(always(),eq(variables['Build.SourceBranch'], 'refs/heads/dev'))
+  pool:
+    vmImage: 'ubuntu-latest'
+  jobs:
+  - job: Build
+    steps:   
+      - task: Docker@2
+        inputs:
+          containerRegistry: $(containerRegistryDEV)
+          repository: $(repositoryName)
+          command: 'build'
+          buildContext: $(buildContext)
+          Dockerfile: $(dockerfileRoute)
+          tags: |
+            latest
+            $(Build.BuildId)
+  - job: Push
+    dependsOn: Build
+    steps:
+      - task: Docker@2
+        inputs:
+          containerRegistry: $(containerRegistryDEV)
+          repository: $(repositoryName)
+          command: 'push'
+          tags: |
+            latest
+            $(Build.BuildId)
+          
+- stage: 'QA'
+  condition: and(always(),eq(variables['Build.SourceBranch'], 'refs/heads/qa'))
+  pool:
+    vmImage: 'ubuntu-latest'
+  jobs:
+  - job: Build
+    steps:   
+      - task: Docker@2
+        inputs:
+          containerRegistry: $(containerRegistryQA)
+          repository: $(repositoryName)
+          command: 'build'
+          buildContext: $(buildContext)
+          Dockerfile: $(dockerfileRoute)
+          tags: |
+            latest
+            $(Build.BuildId)
+  - job: Push
+    dependsOn: Build
+    steps:
+      - task: Docker@2
+        inputs:
+          containerRegistry: $(containerRegistryQA)
+          repository: $(repositoryName)
+          command: 'push'
+          tags: |
+            latest
+            $(Build.BuildId)
+
+- stage: 'PRD'
+  condition: and(always(),eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  pool:
+    vmImage: 'ubuntu-latest'
+  jobs:
+  - job: Build
+    steps:   
+      - task: Docker@2
+        inputs:
+          containerRegistry: $(containerRegistryPRD)
+          repository: $(repositoryName)
+          command: 'build'
+          buildContext: $(buildContext)
+          Dockerfile: $(dockerfileRoute)
+          tags: |
+            latest
+            $(Build.BuildId)
+  - job: Push
+    dependsOn: Build
+    steps:
+      - task: Docker@2
+        inputs:
+          containerRegistry: $(containerRegistryPRD)
+          repository: $(repositoryName)
+          command: 'push'
+          tags: |
+            latest
+            $(Build.BuildId)
+
+- stage: 'Clean'
+  condition: always()
+  jobs:
+    - job: CleanWorkSpace
+      workspace:
+        clean: all

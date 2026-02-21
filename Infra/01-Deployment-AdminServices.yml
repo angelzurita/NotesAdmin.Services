@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: adminservices-app
+  namespace: adminservices
+  labels:
+    azure.workload.identity/use: "true"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: adminservices-app
+  template:
+    metadata:
+      labels:
+        app: adminservices-app
+        azure.workload.identity/use: "true"
+    spec:
+      serviceAccountName: adminservices-sa
+      containers:
+        - name: adminservices-app
+          image: yourregistry.azurecr.io/adminservices.app:latest
+          imagePullPolicy: Always
+          ports:
+          - name: 'http'
+            containerPort: 8080
+
+          env:
+            - name: 'ASPNETCORE_ENVIRONMENT'
+              value: "Production"
+            - name: ApplicationInsights__InstrumentationKey
+              valueFrom:
+                configMapKeyRef:
+                  key: appinsights.key
+                  name: adminservices-config
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          securityContext:
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            privileged: false
+            allowPrivilegeEscalation: false

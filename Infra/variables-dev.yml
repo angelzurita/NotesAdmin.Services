@@ -1,0 +1,7 @@
+# Variables for DEV environment
+variables:
+  environment: 'dev'
+  namespace: 'adminservices'
+  containerRegistry: 'yourregistrydev'
+  keyvault: 'your-keyvault-dev'
+  appconfig: 'your-appconfig-dev'
