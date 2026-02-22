@@ -15,43 +15,53 @@ var builder = WebApplication.CreateBuilder(args);
 // Add environment variables
 builder.Configuration.AddEnvironmentVariables();
 
-// Application Insights - commented for local development
-// builder.Services.AddApplicationInsights(builder.Logging, builder.Configuration);
-
-//Adding global error handler
+// Global Exception Handler
 builder.Services.AddExceptionHandler<CustomExceptionHandler>();
 builder.Services.AddProblemDetails();
 
-// Add Logging Middleware Services
+// =========================
+// ✅ CORS CONFIGURATION
+// =========================
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy
+            .WithOrigins(
+                "http://localhost:4200",     // Angular default
+                "https://localhost:4200",
+                "https://localhost:6001"     // Si estás usando este puerto
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
+
+// Logging
 builder.Services.AddHttpLogging(logging =>
 {
     logging.LoggingFields = HttpLoggingFields.RequestProperties
        | HttpLoggingFields.RequestBody
        | HttpLoggingFields.ResponsePropertiesAndHeaders;
+
     logging.RequestBodyLogLimit = 4096;
     logging.CombineLogs = true;
 });
 
-// Register application services
+// Security
 builder.Services.AddAuthorization();
 builder.Services.AddCustomAuthorization();
 builder.Services.AddCustomAuthentication(builder.Configuration);
 
-// Add Application Services
+// Application + Infrastructure
 builder.Services.AddApplication(builder.Configuration);
-
-// Add Healthchecks
-builder.Services.AddHealthChecks();
-
-// Add Application Infrastructure
 builder.Services.AddInfrastructureServices(builder.Configuration);
-// .AddRedis(builder.Configuration) // Commented for local development
-// .AddServiceBus(builder.Configuration); // Commented for local development
 
-// Add services to the container.
+builder.Services.AddHealthChecks();
 builder.Services.AddEndpointsApiExplorer();
 
-// Swagger Configuration
+// Swagger
 builder.Services.AddSwaggerGen(options =>
 {
     var swaggerOptions = builder.Configuration.GetSection("Swagger").Get<OpenApiInfo>();
@@ -84,7 +94,7 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// Configure JSON options
+// JSON Options
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
@@ -93,7 +103,10 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// =========================
+// PIPELINE CONFIGURATION
+// =========================
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -106,16 +119,25 @@ app.UseHttpLogging();
 
 app.UseHttpsRedirection();
 
+// 🔥 MUY IMPORTANTE EN MINIMAL APIs
+app.UseRouting();
+
+// ✅ CORS DEBE IR ANTES DE AUTH
+app.UseCors("AllowFrontend");
+
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Map endpoints
+// =========================
+// ENDPOINTS
+// =========================
+
 app.MapCategoriesEndpoints();
 app.MapNotesEndpoints();
 app.MapAuthEndpoints();
 app.MapUsersEndpoints();
+app.MapLocalStorageEndpoints();
 
-// Health check endpoint
 app.MapHealthChecks("/health");
 
 app.Run();
