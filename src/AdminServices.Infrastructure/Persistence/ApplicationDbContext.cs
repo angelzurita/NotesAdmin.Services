@@ -16,6 +16,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Note> Notes => Set<Note>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<LocalDocument> LocalDocuments => Set<LocalDocument>();
+    public DbSet<StorageFolder> StorageFolders => Set<StorageFolder>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
