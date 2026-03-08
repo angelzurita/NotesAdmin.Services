@@ -1,0 +1,36 @@
+# Build stage
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Copy project files for layer caching
+COPY Directory.Build.props Directory.Packages.props nuget.config ./
+COPY src/AdminServices.Domain/AdminServices.Domain.csproj              src/AdminServices.Domain/
+COPY src/AdminServices.Application/AdminServices.Application.csproj    src/AdminServices.Application/
+COPY src/AdminServices.Infrastructure/AdminServices.Infrastructure.csproj src/AdminServices.Infrastructure/
+COPY src/AdminServices.McpServer/AdminServices.McpServer.csproj         src/AdminServices.McpServer/
+
+RUN dotnet restore src/AdminServices.McpServer/AdminServices.McpServer.csproj
+
+# Copy all source
+COPY src/ src/
+
+# Publish
+RUN dotnet publish src/AdminServices.McpServer/AdminServices.McpServer.csproj \
+    -c Release -o /app/publish --no-restore
+
+# Runtime stage
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
+
+COPY --from=build /app/publish .
+
+# Non-root user for security
+RUN adduser --disabled-password --no-create-home mcpuser
+USER mcpuser
+
+ENV ASPNETCORE_ENVIRONMENT=Production
+ENV ASPNETCORE_URLS=http://0.0.0.0:5100
+
+EXPOSE 5100
+
+ENTRYPOINT ["./AdminServices.McpServer"]

@@ -137,6 +137,7 @@ app.MapNotesEndpoints();
 app.MapAuthEndpoints();
 app.MapUsersEndpoints();
 app.MapLocalStorageEndpoints();
+app.MapAiEndpoints();
 
 app.MapHealthChecks("/health");
 
