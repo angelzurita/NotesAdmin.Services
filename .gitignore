@@ -9,5 +9,10 @@ obj/
 .DS_Store
 Thumbs.db
 appsettings.Local.json
+appsettings.Production.json
 launchSettings.json
 *.DotSettings.user
+
+# MCP Server secrets — nunca subir al repo
+src/AdminServices.McpServer/appsettings.json
+.env

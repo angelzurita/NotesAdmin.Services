@@ -117,6 +117,10 @@ public static class DependencyInjection
         services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
+        // AI Chat service
+        services.AddSingleton<ChatHistoryStore>();
+        services.AddScoped<IChatService, ChatService>();
+
         // Add Quartz for background jobs
         services.AddQuartz();
 

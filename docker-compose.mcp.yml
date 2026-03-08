@@ -1,0 +1,23 @@
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: admin-mcp-server
+    restart: unless-stopped
+    ports:
+      - "5100:5100"
+    environment:
+      - ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING}
+      - McpServer__ApiKey=${MCP_API_KEY}
+      - Jwt__SecretKey=${JWT_SECRET}
+      - Jwt__Issuer=AdminServices
+      - Jwt__Audience=AdminServicesClient
+      - Jwt__ExpirationInHours=24
+      - ASPNETCORE_ENVIRONMENT=Production
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
