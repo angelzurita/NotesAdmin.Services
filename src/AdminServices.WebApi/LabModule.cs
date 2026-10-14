@@ -60,7 +60,8 @@ public static partial class LabModule
 
     public static void MapLab(this WebApplication app, SsoConfig? sso)
     {
-        app.MapGet("/api/config", () => Results.Ok(new { sso = sso is not null, cuenta = sso?.Publico }))
+        // portal = a dónde regresa el botón "Disciplina" (el portal del laboratorio)
+        app.MapGet("/api/config", (IConfiguration c) => Results.Ok(new { sso = sso is not null, cuenta = sso?.Publico, portal = c["Lab:PortalUrl"] }))
             .ExcludeFromDescription();
         if (sso is null) return;
 

@@ -21,6 +21,7 @@ public class LabAccountTests : IClassFixture<NotesApiFactory>
         var config = await client.GetFromJsonAsync<Dictionary<string, object>>("/api/config");
         config!["sso"].ToString().Should().Be("True");
         config.Should().NotContainKey("ai");
+        config["portal"].ToString().Should().Be("https://disciplina.zuritaserver.com/#labs");
     }
 
     [Fact]
