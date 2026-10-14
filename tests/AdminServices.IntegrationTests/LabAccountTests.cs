@@ -20,7 +20,7 @@ public class LabAccountTests : IClassFixture<NotesApiFactory>
 
         var config = await client.GetFromJsonAsync<Dictionary<string, object>>("/api/config");
         config!["sso"].ToString().Should().Be("True");
-        config["ai"].ToString().Should().Be("False");
+        config.Should().NotContainKey("ai");
     }
 
     [Fact]
@@ -140,12 +140,6 @@ public class LabAccountTests : IClassFixture<NotesApiFactory>
         (await nobody.ReadAsync<Metas>()).Dias.Should().BeEmpty();
     }
 
-    [Fact]
-    public async Task Ai_is_off_without_a_key()
-    {
-        var api = await _factory.SignInAsync("gabo");
-        (await api.PostAsJsonAsync("/api/ai/chat", new { message = "hola" })).StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
-    }
 
     [Fact]
     public async Task Unknown_api_routes_are_json_404()

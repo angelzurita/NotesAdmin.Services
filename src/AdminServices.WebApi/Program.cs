@@ -16,7 +16,7 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Secrets live outside the repo and the package (JWT key, lab account, AI key).
+// Secrets live outside the repo and the package (JWT key, lab account).
 // In the lab: /opt/storage/tenants/alicelabs/sites/notes/secrets/notes.json (override with NOTES_SECRETS).
 builder.Configuration.AddJsonFile(Environment.GetEnvironmentVariable("NOTES_SECRETS")
     ?? "/opt/storage/tenants/alicelabs/sites/notes/secrets/notes.json", optional: true, reloadOnChange: false);
@@ -165,7 +165,6 @@ app.MapNotesEndpoints();
 app.MapAuthEndpoints();
 app.MapUsersEndpoints();
 app.MapLocalStorageEndpoints();
-app.MapAiEndpoints();
 app.MapLab(sso);
 
 app.MapHealthChecks("/health");

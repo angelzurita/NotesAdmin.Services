@@ -66,7 +66,8 @@ Rama **`lab`**: la versión que corre en el laboratorio de zuritaserver.
 - **Sesiones revocables:** cada JWT lleva `sid`; `UserSessions` guarda la sesión y salir (aquí o en Cuenta Lab)
   invalida el token al instante.
 - **Secretos fuera del repo:** `/opt/storage/tenants/alicelabs/sites/notes/secrets/notes.json` (o `NOTES_SECRETS`):
-  `Jwt:SecretKey`, `Sso:{Secret,Interno,Publico,LogoutHash}` y, opcional, `Ai:GeminiApiKey` (sin ella la IA queda apagada).
+  `Jwt:SecretKey` y `Sso:{Secret,Interno,Publico,LogoutHash}`.
+- **Sin IA integrada:** se quitó el chat con Gemini; la IA se usará desde fuera (Codex / Claude Code).
   La BD la inyecta el PaaS en `ConnectionStrings__Postgres`. Las migraciones se aplican al arrancar.
 - **Paquete:** `deploy/lab/empaquetar.sh <ruta/NoteAdmin.Fontend> notes.zip` (csproj único en la raíz + web en `wwwroot`).
 - **Pruebas:** `dotnet test` (las de integración usan un Postgres desechable: `NOTES_TEST_DB`, por defecto

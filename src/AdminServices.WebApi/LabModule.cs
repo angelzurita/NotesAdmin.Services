@@ -16,7 +16,7 @@ namespace AdminServices.WebApi;
 //  GET  /auth/salir         → cierra la sesión central (Cuenta Lab avisa de vuelta para cerrar la de aquí)
 //  POST /auth/sso/cerrar    → aviso de Cuenta Lab (servidor a servidor): cerrar sesiones
 //  POST /auth/sso/metas     → días con notas creadas o editadas (para el hábito ligado en Disciplina)
-//  GET  /api/config         → qué está activo (cuenta del lab, IA) para que la web se adapte
+//  GET  /api/config         → qué está activo (cuenta del lab) para que la web se adapte
 public sealed record SsoConfig(string App, string Secret, string Interno, string Publico, string? LogoutHash)
 {
     public static SsoConfig? From(IConfiguration cfg)
@@ -39,12 +39,10 @@ public static partial class LabModule
     static bool Igual(string a, string b) => CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(a), Encoding.UTF8.GetBytes(b));
     static string Sha256(string s) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(s))).ToLowerInvariant();
 
-    public static bool AiActiva(IConfiguration c) => !string.IsNullOrWhiteSpace(c["Ai:GeminiApiKey"]);
-
     [GeneratedRegex("[^a-z0-9._-]")]
     private static partial Regex NoPermitido();
 
-    // Con la cuenta del lab se apagan el registro/login locales; sin clave, la IA.
+    // Con la cuenta del lab se apagan el registro/login locales.
     public static void UseLabGuards(this WebApplication app, SsoConfig? sso)
     {
         app.Use(async (ctx, next) =>
@@ -56,19 +54,13 @@ public static partial class LabModule
                 await ctx.Response.WriteAsJsonAsync(new { error = "Notes usa tu cuenta del laboratorio: entra desde Disciplina." });
                 return;
             }
-            if (path.StartsWith("/api/ai", StringComparison.OrdinalIgnoreCase) && !AiActiva(app.Configuration))
-            {
-                ctx.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-                await ctx.Response.WriteAsJsonAsync(new { error = "El asistente de IA no está activado en este servidor." });
-                return;
-            }
             await next();
         });
     }
 
     public static void MapLab(this WebApplication app, SsoConfig? sso)
     {
-        app.MapGet("/api/config", (IConfiguration c) => Results.Ok(new { sso = sso is not null, cuenta = sso?.Publico, ai = AiActiva(c) }))
+        app.MapGet("/api/config", () => Results.Ok(new { sso = sso is not null, cuenta = sso?.Publico }))
             .ExcludeFromDescription();
         if (sso is null) return;
 
