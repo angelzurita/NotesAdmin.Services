@@ -8,12 +8,15 @@ namespace AdminServices.Application.Notes.Commands.UpdateNote;
 public class UpdateNoteCommandHandler : IRequestHandler<UpdateNoteCommand, ApiResponse<Guid>>
 {
     private readonly IGenericRepository<Note> _noteRepository;
+    private readonly IGenericRepository<Category> _categoryRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public UpdateNoteCommandHandler(
         IGenericRepository<Note> noteRepository,
+        IGenericRepository<Category> categoryRepository,
         IUnitOfWork unitOfWork)
     {
+        _categoryRepository = categoryRepository;
         _noteRepository = noteRepository;
         _unitOfWork = unitOfWork;
     }
@@ -25,6 +28,11 @@ public class UpdateNoteCommandHandler : IRequestHandler<UpdateNoteCommand, ApiRe
             var note = await _noteRepository.GetByIdAsync(request.Id, cancellationToken);
             if (note is null)
                 return ApiResponse<Guid>.ErrorResponse("Note not found");
+
+            // The category must be one of the user's own (the query filter hides the rest)
+            if (request.CategoryId.HasValue
+                && await _categoryRepository.GetByIdAsync(request.CategoryId.Value, cancellationToken) is null)
+                return ApiResponse<Guid>.ErrorResponse("Category not found");
 
             note.Update(request.Title, request.Content, request.CategoryId, request.Image1, request.Image2, request.Metadata);
             _noteRepository.Update(note);

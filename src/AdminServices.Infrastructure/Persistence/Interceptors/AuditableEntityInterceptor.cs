@@ -1,11 +1,12 @@
 using AdminServices.Application.Common.Interfaces;
+using AdminServices.Domain.Primitives;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace AdminServices.Infrastructure.Persistence.Interceptors;
 
 /// <summary>
-/// Interceptor to automatically set audit fields
+/// Interceptor to automatically set audit fields and the owner of new records
 /// </summary>
 public class AuditableEntityInterceptor : SaveChangesInterceptor
 {
@@ -35,20 +36,23 @@ public class AuditableEntityInterceptor : SaveChangesInterceptor
     {
         if (context == null) return;
 
-        var currentUser = _httpContextService.GetCurrentUserId() ?? "System";
+        (context as ApplicationDbContext)?.StampOwners();
 
-        foreach (var entry in context.ChangeTracker.Entries<Domain.Primitives.Entity>())
+        var currentUser = _httpContextService.GetCurrentUserId() ?? "System";
+        var now = DateTime.UtcNow;
+
+        foreach (var entry in context.ChangeTracker.Entries<Entity>())
         {
             if (entry.State == EntityState.Added)
             {
-                entry.Entity.GetType().GetProperty("CreatedBy")?.SetValue(entry.Entity, currentUser);
-                entry.Entity.GetType().GetProperty("CreatedAt")?.SetValue(entry.Entity, DateTime.UtcNow);
+                entry.Property(e => e.CreatedBy).CurrentValue = currentUser;
+                entry.Property(e => e.CreatedAt).CurrentValue = now;
             }
 
             if (entry.State == EntityState.Modified)
             {
-                entry.Entity.GetType().GetProperty("UpdatedBy")?.SetValue(entry.Entity, currentUser);
-                entry.Entity.GetType().GetProperty("UpdatedAt")?.SetValue(entry.Entity, DateTime.UtcNow);
+                entry.Property(e => e.UpdatedBy).CurrentValue = currentUser;
+                entry.Property(e => e.UpdatedAt).CurrentValue = now;
             }
         }
     }

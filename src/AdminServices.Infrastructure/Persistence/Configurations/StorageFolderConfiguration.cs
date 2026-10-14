@@ -11,6 +11,9 @@ public class StorageFolderConfiguration : IEntityTypeConfiguration<StorageFolder
         builder.ToTable("StorageFolders");
         builder.HasKey(f => f.Id);
 
+        builder.Property(f => f.OwnerId).IsRequired().HasMaxLength(100);
+        builder.HasIndex(f => f.OwnerId);
+
         builder.Property(f => f.Name)
             .IsRequired()
             .HasMaxLength(255);

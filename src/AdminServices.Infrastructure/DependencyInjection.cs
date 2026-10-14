@@ -26,7 +26,6 @@ using Microsoft.Extensions.Options;
 using Polly;
 using Polly.Extensions.Http;
 // using StackExchange.Redis;
-using Quartz;
 
 namespace AdminServices.Infrastructure;
 
@@ -74,7 +73,9 @@ public static class DependencyInjection
 
         services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
         {
-            var connectionString = configuration.GetConnectionString("DefaultConnection");
+            // The lab PaaS injects ConnectionStrings__Postgres; local/dev setups use DefaultConnection
+            var connectionString = configuration.GetConnectionString("Postgres")
+                ?? configuration.GetConnectionString("DefaultConnection");
             if (connectionString != null)
             {
                 options.AddInterceptors(serviceProvider.GetServices<ISaveChangesInterceptor>());
@@ -112,6 +113,7 @@ public static class DependencyInjection
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
+        services.AddScoped<ISessionService, SessionService>();
 
         // Add repositories
         services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
@@ -120,11 +122,6 @@ public static class DependencyInjection
         // AI Chat service
         services.AddSingleton<ChatHistoryStore>();
         services.AddScoped<IChatService, ChatService>();
-
-        // Add Quartz for background jobs
-        services.AddQuartz();
-
-        services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 
         return services;
     }

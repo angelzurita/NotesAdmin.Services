@@ -5,8 +5,10 @@ namespace AdminServices.Domain.Entities;
 /// <summary>
 /// Entity to store documents in the database as base64
 /// </summary>
-public class LocalDocument : Entity
+public class LocalDocument : Entity, IOwned
 {
+    /// <summary>Id of the user who owns this record (set automatically on insert)</summary>
+    public string OwnerId { get; private set; } = string.Empty;
     public string FileName { get; private set; } = string.Empty;
     public string ContentType { get; private set; } = string.Empty;
     public string FileDataBase64 { get; private set; } = string.Empty;

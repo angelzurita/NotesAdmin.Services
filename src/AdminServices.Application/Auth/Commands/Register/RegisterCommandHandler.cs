@@ -31,7 +31,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, ApiRespon
                 return ApiResponse<Guid>.ErrorResponse("A user with this email already exists");
 
             var passwordHash = _passwordHasher.Hash(request.Password);
-            var user = new User(request.Email, passwordHash, request.FullName, request.Role);
+            var user = new User(request.Email, passwordHash, request.FullName); // self-registration never grants Admin
 
             await _userRepository.AddAsync(user, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);

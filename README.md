@@ -16,8 +16,7 @@ AdminServices/
 │   └── AdminServices.WebApi/          # Entry point and configuration
 ├── tests/
 │   ├── AdminServices.UnitTests/
-│   ├── AdminServices.IntegrationTests/
-│   └── AdminServices.FunctionalTests/
+│   └── AdminServices.IntegrationTests/
 ├── Infra/                             # Kubernetes manifests
 └── Pipelines/                         # CI/CD pipelines
 ```
@@ -53,6 +52,25 @@ AdminServices/
 - **xUnit** - Unit testing
 - **Docker** - Containerization
 - **Kubernetes** - Orchestration
+
+## 🧪 Laboratorio (notes.zuritaserver.com)
+
+Rama **`lab`**: la versión que corre en el laboratorio de zuritaserver.
+
+- **Datos por usuario:** notas, categorías, carpetas y documentos tienen `OwnerId`; un filtro global de EF
+  (`ApplicationDbContext`) hace que cada usuario solo vea y modifique lo suyo, y el interceptor fija el dueño al crear.
+- **Cuenta Lab (SSO):** con `Sso:Secret` configurado se entra con la cuenta del laboratorio (`/auth/sso` →
+  Cuenta Lab → `/auth/sso/callback` → `/#lab=<token>`) y el registro/login locales responden 410.
+  `POST /auth/sso/cerrar` y `POST /auth/sso/metas` son llamadas servidor a servidor de Cuenta Lab
+  (clave = `logoutKey`, se rechazan si llegan por Cloudflare). Detalle en `src/AdminServices.WebApi/LabModule.cs`.
+- **Sesiones revocables:** cada JWT lleva `sid`; `UserSessions` guarda la sesión y salir (aquí o en Cuenta Lab)
+  invalida el token al instante.
+- **Secretos fuera del repo:** `/opt/storage/tenants/alicelabs/sites/notes/secrets/notes.json` (o `NOTES_SECRETS`):
+  `Jwt:SecretKey`, `Sso:{Secret,Interno,Publico,LogoutHash}` y, opcional, `Ai:GeminiApiKey` (sin ella la IA queda apagada).
+  La BD la inyecta el PaaS en `ConnectionStrings__Postgres`. Las migraciones se aplican al arrancar.
+- **Paquete:** `deploy/lab/empaquetar.sh <ruta/NoteAdmin.Fontend> notes.zip` (csproj único en la raíz + web en `wwwroot`).
+- **Pruebas:** `dotnet test` (las de integración usan un Postgres desechable: `NOTES_TEST_DB`, por defecto
+  `127.0.0.1:55441` usuario/clave `notes_test`).
 
 ## 📋 Prerequisites
 

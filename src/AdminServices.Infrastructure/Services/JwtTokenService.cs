@@ -18,7 +18,9 @@ public class JwtTokenService : IJwtTokenService
         _jwtOptions = jwtOptions.Value;
     }
 
-    public string GenerateToken(User user)
+    public TimeSpan Lifetime => TimeSpan.FromHours(_jwtOptions.ExpirationInHours);
+
+    public IssuedToken GenerateToken(User user, Guid sessionId, DateTime expiresAt)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.SecretKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -28,6 +30,7 @@ public class JwtTokenService : IJwtTokenService
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(JwtRegisteredClaimNames.Email, user.Email),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new(JwtRegisteredClaimNames.Sid, sessionId.ToString()),
             new(ClaimTypes.Name, user.FullName),
             new(ClaimTypes.Role, user.Role),
             new("uid", user.Id.ToString())
@@ -37,9 +40,9 @@ public class JwtTokenService : IJwtTokenService
             issuer: _jwtOptions.Issuer,
             audience: _jwtOptions.Audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(_jwtOptions.ExpirationInHours),
+            expires: expiresAt,
             signingCredentials: credentials);
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        return new IssuedToken(new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
     }
 }

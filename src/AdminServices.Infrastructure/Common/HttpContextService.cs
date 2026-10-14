@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using AdminServices.Application.Common.Interfaces;
 using Microsoft.AspNetCore.Http;
 
@@ -15,15 +16,20 @@ public class HttpContextService : IHttpContextService
         _httpContextAccessor = httpContextAccessor;
     }
 
+    private ClaimsPrincipal? User =>
+        _httpContextAccessor.HttpContext?.User is { Identity.IsAuthenticated: true } user ? user : null;
+
     public string? GetCurrentUserId()
     {
-        return _httpContextAccessor.HttpContext?.User?.FindFirst("sub")?.Value
-            ?? _httpContextAccessor.HttpContext?.User?.FindFirst("oid")?.Value;
+        // "uid" is written by JwtTokenService; "sub" arrives mapped to NameIdentifier by the JWT handler.
+        return User?.FindFirst("uid")?.Value
+            ?? User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? User?.FindFirst("sub")?.Value;
     }
 
     public string? GetCurrentUserEmail()
     {
-        return _httpContextAccessor.HttpContext?.User?.FindFirst("email")?.Value;
+        return User?.FindFirst(ClaimTypes.Email)?.Value ?? User?.FindFirst("email")?.Value;
     }
 
     public string? GetClientCode()

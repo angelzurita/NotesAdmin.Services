@@ -9,16 +9,16 @@ namespace AdminServices.Application.Auth.Commands.Login;
 public class LoginCommandHandler : IRequestHandler<LoginCommand, ApiResponse<LoginResponse>>
 {
     private readonly IGenericRepository<User> _userRepository;
-    private readonly IJwtTokenService _jwtTokenService;
+    private readonly ISessionService _sessionService;
     private readonly IPasswordHasher _passwordHasher;
 
     public LoginCommandHandler(
         IGenericRepository<User> userRepository,
-        IJwtTokenService jwtTokenService,
+        ISessionService sessionService,
         IPasswordHasher passwordHasher)
     {
         _userRepository = userRepository;
-        _jwtTokenService = jwtTokenService;
+        _sessionService = sessionService;
         _passwordHasher = passwordHasher;
     }
 
@@ -35,25 +35,26 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, ApiResponse<Log
             if (!user.IsActive)
                 return ApiResponse<LoginResponse>.ErrorResponse("User account is deactivated");
 
-            if (!_passwordHasher.Verify(request.Password, user.PasswordHash))
+            // Lab-account users have no local password
+            if (string.IsNullOrEmpty(user.PasswordHash) || !_passwordHasher.Verify(request.Password, user.PasswordHash))
                 return ApiResponse<LoginResponse>.ErrorResponse("Invalid email or password");
 
-            var token = _jwtTokenService.GenerateToken(user);
+            var issued = await _sessionService.SignInAsync(user, cancellationToken: cancellationToken);
 
             var response = new LoginResponse
             {
-                Token = token,
+                Token = issued.Token,
                 Email = user.Email,
                 FullName = user.FullName,
                 Role = user.Role,
-                ExpiresAt = DateTime.UtcNow.AddHours(24)
+                ExpiresAt = issued.ExpiresAt
             };
 
             return ApiResponse<LoginResponse>.SuccessResponse(response, "Login successful");
         }
         catch (Exception ex)
         {
-            return ApiResponse<LoginResponse>.ErrorResponse($"Error during login: {ex.Message}");
+            return ApiResponse<LoginResponse>.ErrorResponse("Error during login", new List<string> { ex.Message });
         }
     }
 }

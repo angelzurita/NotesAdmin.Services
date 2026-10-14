@@ -6,8 +6,10 @@ namespace AdminServices.Domain.Entities;
 /// Represents a folder (or subfolder) in the local storage system.
 /// Self-referencing for infinite recursive nesting.
 /// </summary>
-public class StorageFolder : Entity
+public class StorageFolder : Entity, IOwned
 {
+    /// <summary>Id of the user who owns this record (set automatically on insert)</summary>
+    public string OwnerId { get; private set; } = string.Empty;
     public string Name { get; private set; } = string.Empty;
     public Guid? ParentFolderId { get; private set; }
     public StorageFolder? ParentFolder { get; private set; }

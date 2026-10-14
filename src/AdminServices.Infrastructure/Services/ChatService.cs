@@ -13,7 +13,6 @@ using AdminServices.Application.Notes.Commands.DeleteNote;
 using AdminServices.Application.Notes.Commands.UpdateNote;
 using AdminServices.Application.Notes.Queries.GetAllNotes;
 using AdminServices.Application.Notes.Queries.GetNoteById;
-using AdminServices.Application.Users.Queries.GetAllUsers;
 using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -32,9 +31,11 @@ public class ChatService : IChatService
     private readonly IConfiguration _configuration;
     private readonly ILogger<ChatService> _logger;
     private readonly ChatHistoryStore _historyStore;
+    private readonly IHttpContextService _httpContextService;
 
-    public ChatService(IMediator mediator, IConfiguration configuration, ILogger<ChatService> logger, ChatHistoryStore historyStore)
+    public ChatService(IMediator mediator, IConfiguration configuration, ILogger<ChatService> logger, ChatHistoryStore historyStore, IHttpContextService httpContextService)
     {
+        _httpContextService = httpContextService;
         _mediator = mediator;
         _configuration = configuration;
         _logger = logger;
@@ -49,7 +50,7 @@ public class ChatService : IChatService
             var modelId = _configuration["Ai:ModelId"] ?? "gemini-1.5-flash";
 
             if (string.IsNullOrWhiteSpace(apiKey))
-                return new ChatResponse(false, string.Empty, "AI service is not configured. Please set Ai:GeminiApiKey in appsettings.");
+                return new ChatResponse(false, string.Empty, "El asistente de IA no está activado en este servidor.");
 
             // Build Semantic Kernel using Gemini's OpenAI-compatible endpoint
             var kernelBuilder = Kernel.CreateBuilder()
@@ -64,11 +65,13 @@ public class ChatService : IChatService
             var plugin = KernelPluginFactory.CreateFromObject(new DatabasePlugin(_mediator), "AdminServices");
             kernel.Plugins.Add(plugin);
 
-            // Use or create persistent session history
-            var activeSessionId = sessionId ?? Guid.NewGuid().ToString();
-            var history = _historyStore.GetOrCreate(activeSessionId, """
+            // Use or create persistent session history (namespaced by user: a session id never
+            // gives access to someone else's conversation)
+            var activeSessionId = string.IsNullOrWhiteSpace(sessionId) ? Guid.NewGuid().ToString() : sessionId;
+            var userId = _httpContextService.GetCurrentUserId() ?? "anon";
+            var history = _historyStore.GetOrCreate($"{userId}:{activeSessionId}", """
                 Eres un asistente inteligente con acceso a la base de datos de AdminServices.
-                Puedes consultar y gestionar notas, categorías, documentos y usuarios.
+                Puedes consultar y gestionar las notas, categorías y documentos del usuario.
                 Responde siempre en el mismo idioma que usa el usuario.
                 Cuando el usuario pida datos, usa las herramientas disponibles para obtenerlos en tiempo real.
                 Sé conciso, claro y útil.
@@ -248,13 +251,5 @@ public class ChatService : IChatService
             return JsonSerializer.Serialize(result.Data);
         }
 
-        // Users
-
-        [KernelFunction, Description("Gets all users from the database (no passwords or sensitive data)")]
-        public async Task<string> GetAllUsers(CancellationToken cancellationToken = default)
-        {
-            var result = await _mediator.Send(new GetAllUsersQuery(), cancellationToken);
-            return JsonSerializer.Serialize(result.Data);
-        }
     }
 }

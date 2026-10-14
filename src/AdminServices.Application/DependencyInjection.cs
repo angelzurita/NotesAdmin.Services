@@ -1,5 +1,5 @@
+using AdminServices.Application.Common.Behaviors;
 using FluentValidation;
-using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
@@ -15,14 +15,14 @@ public static class DependencyInjection
     {
         var assembly = Assembly.GetExecutingAssembly();
 
-        // Add MediatR
-        services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(assembly));
+        // MediatR + validation of every request before its handler
+        services.AddMediatR(cfg =>
+        {
+            cfg.RegisterServicesFromAssembly(assembly);
+            cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+        });
 
-        // Add FluentValidation
         services.AddValidatorsFromAssembly(assembly);
-
-        // Add AutoMapper
-        services.AddAutoMapper(assembly);
 
         return services;
     }

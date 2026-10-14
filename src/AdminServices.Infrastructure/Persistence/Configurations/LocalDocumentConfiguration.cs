@@ -11,6 +11,9 @@ public class LocalDocumentConfiguration : IEntityTypeConfiguration<LocalDocument
         builder.ToTable("LocalDocuments");
         builder.HasKey(d => d.Id);
 
+        builder.Property(d => d.OwnerId).IsRequired().HasMaxLength(100);
+        builder.HasIndex(d => d.OwnerId);
+
         builder.Property(d => d.FileName)
             .IsRequired()
             .HasMaxLength(255);

@@ -11,6 +11,9 @@ public class NoteConfiguration : IEntityTypeConfiguration<Note>
         builder.ToTable("Notes");
         builder.HasKey(n => n.Id);
 
+        builder.Property(n => n.OwnerId).IsRequired().HasMaxLength(100);
+        builder.HasIndex(n => n.OwnerId);
+
         builder.Property(n => n.Title).IsRequired().HasMaxLength(500);
         builder.Property(n => n.Content).IsRequired();
         builder.Property(n => n.Image1).HasColumnType("text");

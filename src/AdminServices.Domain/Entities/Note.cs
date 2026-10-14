@@ -5,8 +5,10 @@ namespace AdminServices.Domain.Entities;
 /// <summary>
 /// Note entity for notes management
 /// </summary>
-public class Note : Entity
+public class Note : Entity, IOwned
 {
+    /// <summary>Id of the user who owns this record (set automatically on insert)</summary>
+    public string OwnerId { get; private set; } = string.Empty;
     public string Title { get; private set; } = string.Empty;
     public Guid? CategoryId { get; private set; }
     public Category? Category { get; private set; }
