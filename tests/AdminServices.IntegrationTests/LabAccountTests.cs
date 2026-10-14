@@ -143,6 +143,30 @@ public class LabAccountTests : IClassFixture<NotesApiFactory>
 
 
     [Fact]
+    public async Task Progress_for_the_lab_account_admin_panel()
+    {
+        var api = await _factory.SignInAsync("gabi");
+        (await api.PostAsJsonAsync("/api/notes", new { title = "Uno", content = "<p>a</p>" })).StatusCode.Should().Be(HttpStatusCode.Created);
+        (await api.PostAsJsonAsync("/api/notes", new { title = "Dos", content = "<p>b</p>" })).StatusCode.Should().Be(HttpStatusCode.Created);
+        var client = _factory.CreateClient();
+
+        (await client.PostAsJsonAsync("/auth/sso/progreso", new { clave = "wrong" })).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var fromInternet = new HttpRequestMessage(HttpMethod.Post, "/auth/sso/progreso") { Content = JsonContent.Create(new { clave = NotesApiFactory.LogoutKey }) };
+        fromInternet.Headers.Add("CF-Connecting-IP", "203.0.113.9");
+        (await client.SendAsync(fromInternet)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        var res = await client.PostAsJsonAsync("/auth/sso/progreso", new { clave = NotesApiFactory.LogoutKey, sub = "sub-gabi", dias = 30 });
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var p = await res.ReadAsync<System.Text.Json.JsonElement>();
+        p.GetProperty("kpis").GetArrayLength().Should().BeGreaterThan(3);
+        p.GetProperty("diario")[0].GetProperty("valor").GetInt32().Should().Be(2);
+        var users = p.GetProperty("usuarios");
+        users.GetArrayLength().Should().Be(1, "with sub only that account comes back");
+        users[0].GetProperty("sub").GetString().Should().Be("sub-gabi");
+        users[0].GetProperty("kpis")[0].GetProperty("valor").GetInt32().Should().Be(2);
+    }
+
+    [Fact]
     public async Task Unknown_api_routes_are_json_404()
     {
         var res = await _factory.CreateClient().GetAsync("/api/no-existe");

@@ -16,6 +16,7 @@ namespace AdminServices.WebApi;
 //  GET  /auth/salir         → cierra la sesión central (Cuenta Lab avisa de vuelta para cerrar la de aquí)
 //  POST /auth/sso/cerrar    → aviso de Cuenta Lab (servidor a servidor): cerrar sesiones
 //  POST /auth/sso/metas     → días con notas creadas o editadas (para el hábito ligado en Disciplina)
+//  POST /auth/sso/progreso  → notas, categorías, archivos y días escribiendo (panel de admin de Cuenta Lab)
 //  GET  /api/config         → qué está activo (cuenta del lab) para que la web se adapte
 public sealed record SsoConfig(string App, string Secret, string Interno, string Publico, string? LogoutHash)
 {
@@ -30,6 +31,7 @@ public sealed record SsoConfig(string App, string Secret, string Interno, string
 }
 
 public sealed record CuentaReq(string? Clave, string? Sub, string? Sid, string? Excepto, string? Desde, string? Hasta);
+public sealed record ProgresoReq(string? Clave, string? Sub, int? Dias);
 
 public static partial class LabModule
 {
@@ -161,6 +163,71 @@ public static partial class LabModule
                 .Where(f => f >= desde && f <= hasta).Distinct().Order().Select(f => f.ToString("yyyy-MM-dd"));
             // "Meta" en Notes = escribir o editar al menos una nota ese día.
             return Results.Ok(new { dias, meta = 1 });
+        }).ExcludeFromDescription();
+
+        // Progreso para el panel de admin de Cuenta Lab (todas las cuentas enlazadas, o solo `sub`). Formato común a los labs:
+        // { unidad, kpis, diario: [{dia, activos, valor}], secciones, usuarios: [{sub, usuario, ultima, kpis, progreso}] }.
+        app.MapPost("/auth/sso/progreso", async (HttpContext ctx, ProgresoReq req, ApplicationDbContext db, CancellationToken ct) =>
+        {
+            if (ctx.Request.Headers.ContainsKey("CF-Connecting-IP") || string.IsNullOrEmpty(sso.LogoutHash) || !Igual(Sha256(req.Clave ?? ""), sso.LogoutHash))
+                return Results.Json(new { error = "No autorizado." }, statusCode: 404);
+            var dias = Math.Clamp(req.Dias ?? 30, 1, 365);
+            var desde = DateTime.UtcNow.AddDays(-dias);
+            var tz = TimeZoneInfo.FindSystemTimeZoneById("America/Mexico_City");
+            string Dia(DateTime f) => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(f, DateTimeKind.Utc), tz).ToString("yyyy-MM-dd");
+
+            var users = await db.Users.AsNoTracking().Where(u => u.SsoSub != null && (req.Sub == null || u.SsoSub == req.Sub))
+                .Select(u => new { Owner = u.Id.ToString(), u.SsoSub, u.FullName, u.Email }).ToListAsync(ct);
+            var owners = users.Select(u => u.Owner).ToList();
+            // Sin usuario autenticado: se filtra por dueño a mano (los filtros de consulta van por usuario).
+            var notas = await db.Notes.IgnoreQueryFilters().AsNoTracking().Where(n => owners.Contains(n.OwnerId) && !n.IsDeleted)
+                .Select(n => new { n.OwnerId, n.CreatedAt, n.UpdatedAt }).ToListAsync(ct);
+            var categorias = await db.Categories.IgnoreQueryFilters().AsNoTracking().Where(c => owners.Contains(c.OwnerId) && !c.IsDeleted)
+                .GroupBy(c => c.OwnerId).Select(g => new { Owner = g.Key, N = g.Count() }).ToDictionaryAsync(x => x.Owner, x => x.N, ct);
+            var archivos = await db.LocalDocuments.IgnoreQueryFilters().AsNoTracking().Where(d => owners.Contains(d.OwnerId) && !d.IsDeleted)
+                .GroupBy(d => d.OwnerId).Select(g => new { Owner = g.Key, N = g.Count(), Bytes = g.Sum(d => d.FileSizeBytes) }).ToDictionaryAsync(x => x.Owner, ct);
+
+            // Cada creación o edición cuenta como una actividad de ese día.
+            var actividad = notas.SelectMany(n => n.UpdatedAt is { } u && Dia(u) != Dia(n.CreatedAt)
+                    ? new[] { (n.OwnerId, Fecha: n.CreatedAt), (n.OwnerId, Fecha: u) } : new[] { (n.OwnerId, Fecha: n.UpdatedAt ?? n.CreatedAt) })
+                .Where(a => a.Fecha >= desde).ToList();
+            static string Mb(long b) => b >= 1_048_576 ? $"{b / 1_048_576.0:0.0} MB" : $"{b / 1024.0:0} KB";
+            var creadas = notas.Count(n => n.CreatedAt >= desde);
+
+            return Results.Ok(new
+            {
+                unidad = "notas escritas o editadas",
+                kpis = new object[]
+                {
+                    new { etiqueta = "Personas con notas", valor = notas.Select(n => n.OwnerId).Distinct().Count(), detalle = $"{actividad.Select(a => a.OwnerId).Distinct().Count()} activas en el periodo" },
+                    new { etiqueta = "Notas nuevas", valor = creadas, detalle = $"{notas.Count} en total" },
+                    new { etiqueta = "Notas editadas", valor = notas.Count(n => n.UpdatedAt >= desde && n.CreatedAt < desde), detalle = "escritas antes del periodo" },
+                    new { etiqueta = "Categorías", valor = categorias.Values.Sum() },
+                    new { etiqueta = "Archivos", valor = archivos.Values.Sum(a => a.N), detalle = Mb(archivos.Values.Sum(a => a.Bytes)) },
+                },
+                diario = actividad.GroupBy(a => Dia(a.Fecha)).OrderBy(g => g.Key)
+                    .Select(g => new { dia = g.Key, activos = g.Select(a => a.OwnerId).Distinct().Count(), valor = g.Count() }),
+                secciones = Array.Empty<object>(),
+                usuarios = users.Select(u =>
+                {
+                    var mias = notas.Where(n => n.OwnerId == u.Owner).ToList();
+                    var ultima = mias.Select(n => (DateTime?)(n.UpdatedAt ?? n.CreatedAt)).Max();
+                    var arch = archivos.GetValueOrDefault(u.Owner);
+                    return new
+                    {
+                        sub = u.SsoSub, usuario = string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName,
+                        ultima = ultima is null ? null : DateTime.SpecifyKind(ultima.Value, DateTimeKind.Utc).ToString("o"),
+                        kpis = new object[]
+                        {
+                            new { etiqueta = "Notas", valor = mias.Count, detalle = $"{mias.Count(n => n.CreatedAt >= desde)} nuevas en el periodo" },
+                            new { etiqueta = "Días escribiendo", valor = actividad.Where(a => a.OwnerId == u.Owner).Select(a => Dia(a.Fecha)).Distinct().Count(), detalle = "en el periodo" },
+                            new { etiqueta = "Categorías", valor = categorias.GetValueOrDefault(u.Owner) },
+                            new { etiqueta = "Archivos", valor = arch?.N ?? 0, detalle = Mb(arch?.Bytes ?? 0) },
+                        },
+                        progreso = Array.Empty<object>(),
+                    };
+                }),
+            });
         }).ExcludeFromDescription();
     }
 }
