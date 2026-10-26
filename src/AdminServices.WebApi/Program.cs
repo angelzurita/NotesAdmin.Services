@@ -132,6 +132,7 @@ app.Use(async (ctx, next) =>
     h["X-Content-Type-Options"] = "nosniff";
     h["Referrer-Policy"] = "same-origin";
     h["X-Frame-Options"] = "DENY";
+    h["Strict-Transport-Security"] = "max-age=31536000";
     h["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
         "img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
     await next();
@@ -140,14 +141,15 @@ app.Use(async (ctx, next) =>
 var sso = SsoConfig.From(app.Configuration);
 app.UseLabGuards(sso);
 
-// Web (Angular build in wwwroot): hashed files are immutable, index.html is never cached
+// Web (Angular build in wwwroot): hashed files are immutable, index.html is never cached.
+// no-transform keeps Cloudflare from injecting its Web Analytics beacon (blocked by the CSP anyway).
 app.UseDefaultFiles();
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx =>
     {
         ctx.Context.Response.Headers.CacheControl = ctx.File.Name == "index.html"
-            ? "no-cache"
+            ? "no-cache, no-transform"
             : "public, max-age=31536000, immutable";
     }
 });
@@ -174,7 +176,7 @@ app.MapFallback("/api/{**rest}", () => Results.NotFound(new { error = "No existe
 app.MapFallback("/auth/{**rest}", () => Results.NotFound(new { error = "No existe" }));
 app.MapFallbackToFile("index.html", new StaticFileOptions
 {
-    OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache"
+    OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache, no-transform"
 });
 
 app.Run();
